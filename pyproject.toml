@@ -1,0 +1,26 @@
+[project]
+name = "wavtokenizer"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "einops==0.6.1",
+    "encodec==0.1.1",
+    "fairseq>=0.12.2",
+    "huggingface-hub==0.23.0",
+    "jsonargparse[signatures]>=4.15.2",
+    "librosa>=0.10.2.post1",
+    "matplotlib==3.7.1",
+    "numpy==1.23.5",
+    "pesq>=0.0.4",
+    "pytorch-lightning==1.8.6",
+    "pyyaml==6.0",
+    "scipy==1.10.1",
+    "soundfile==0.12.1",
+    "tensorboardx==2.6",
+    "torch==2.0.0",
+    "torchaudio==2.0.1",
+    "torchcrepe>=0.0.23",
+    "transformers==4.28.1",
+]
