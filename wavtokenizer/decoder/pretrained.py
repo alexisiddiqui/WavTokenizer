@@ -1,11 +1,12 @@
 import os
-from typing import Tuple, Any, Union, Dict
+from typing import Any, Dict, Tuple, Union
 
 import torch
 import yaml
 from huggingface_hub import hf_hub_download
 from torch import nn
-from decoder.feature_extractors import FeatureExtractor, EncodecFeatures
+
+from decoder.feature_extractors import EncodecFeatures, FeatureExtractor
 from decoder.heads import FourierHead
 from decoder.models import Backbone
 

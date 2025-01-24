@@ -19,8 +19,11 @@ dependencies = [
     "scipy==1.10.1",
     "soundfile==0.12.1",
     "tensorboardx==2.6",
-    "torch==2.0.0",
-    "torchaudio==2.0.1",
+    "torch==2.1.2",  # Updated for CUDA 12.1 compatibility
+    "torchaudio==2.1.2",  # Updated to match torch version
     "torchcrepe>=0.0.23",
     "transformers==4.28.1",
 ]
+
+[[tool.uv.source]]
+url = "https://download.pytorch.org/whl/cu121"

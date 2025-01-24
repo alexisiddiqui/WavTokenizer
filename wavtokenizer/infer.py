@@ -1,75 +1,111 @@
 # --coding:utf-8--
 import os
 
-from encoder.utils import convert_audio
-import torchaudio
 import torch
+import torchaudio
 from decoder.pretrained import WavTokenizer
 
-import time
+print("Starting script execution...")
 
-import logging
+# Device setup
+device1 = torch.device("cuda:0")
+print(f"Using device: {device1}")
 
-device1=torch.device('cuda:0')
-# device2=torch.device('cpu')
+# Set up paths
+base_dir = os.path.dirname(os.path.abspath(__file__))
+os.chdir(base_dir)
+print(f"Changed working directory to: {base_dir}")
 
-input_path = "./WavTokenizer/data/infer/lirbitts_testclean"
-out_folder = './WavTokenizer/result/infer'
-# os.system("rm -r %s"%(out_folder))
-# os.system("mkdir -p %s"%(out_folder))
-# ll="libritts_testclean500_large"
-ll="wavtokenizer_smalldata_frame40_3s_nq1_code4096_dim512_kmeans200_attn_testclean_epoch34"
+# Input path points to LibriTTS test-clean directory
+input_path = "/home/alexi/Documents/WavTokenizer/wavtokenizer/data/infer/lirbitts_testclean/LibriTTS/test-clean"
+out_folder = "/home/alexi/Documents/WavTokenizer/wavtokenizer/result/infer"
+print(f"Input path: {input_path}")
+print(f"Output folder: {out_folder}")
 
-tmptmp=out_folder+"/"+ll
+# Model configuration
+ll = "wavtokenizer_smalldata_frame40_3s_nq1_code4096_dim512_kmeans200_attn_testclean_epoch34"
+tmptmp = out_folder + "/" + ll
+os.makedirs(tmptmp, exist_ok=True)
+print(f"Created output directory: {tmptmp}")
 
-os.system("rm -r %s"%(tmptmp))
-os.system("mkdir -p %s"%(tmptmp))
+# Load model
+print("\nLoading model...")
+config_path = "/home/alexi/Documents/WavTokenizer/wavtokenizer/configs/wavtokenizer_smalldata_frame75_3s_nq1_code4096_dim512_kmeans200_attn.yaml"
+model_path = "/home/alexi/Documents/music-preview-visualiser/raw_data/WavTokenizer-large-speech-75token/wavtokenizer_large_speech_320_24k.ckpt"
+print(f"Config path: {config_path}")
+print(f"Model path: {model_path}")
 
-# 自己数据模型加载
-config_path = "./WavTokenizer/configs/wavtokenizer_smalldata_frame40_3s_nq1_code4096_dim512_kmeans200_attn.yaml"
-model_path = "./WavTokenizer/result/train/wavtokenizer_smalldata_frame40_3s_nq1_code4096_dim512_kmeans200_attn/lightning_logs/version_3/checkpoints/wavtokenizer_checkpoint_epoch=24_step=137150_val_loss=5.6731.ckpt"
-wavtokenizer = WavTokenizer.from_pretrained0802(config_path, model_path)
-wavtokenizer = wavtokenizer.to(device1)
-# wavtokenizer = wavtokenizer.to(device2)
+try:
+    wavtokenizer = WavTokenizer.from_pretrained0802(config_path, model_path)
+    wavtokenizer = wavtokenizer.to(device1)
+    print("Model loaded successfully and moved to GPU")
+except Exception as e:
+    print(f"Error loading model: {str(e)}")
+    raise
 
-with open(input_path,'r') as fin:
-    x=fin.readlines()
+# Collect all WAV files recursively
+print("\nCollecting WAV files...")
+wav_files = []
+for root, dirs, files in os.walk(input_path):
+    for file in files:
+        if file.endswith(".wav"):
+            wav_files.append(os.path.join(root, file))
 
-x = [i.strip() for i in x]
+print(f"Found {len(wav_files)} WAV files")
+print(f"First few files: {wav_files[:3]}")
 
-# 完成一些加速处理
+# Process all files
+print("\nStarting encoding process...")
+features_all = []
+for i, wav_path in enumerate(wav_files):
+    try:
+        print(f"\nProcessing file {i + 1}/{len(wav_files)}")
+        print(f"Loading: {wav_path}")
 
-features_all=[]
+        wav, sr = torchaudio.load(wav_path)
+        print(f"Loaded audio shape: {wav.shape}, Sample rate: {sr}")
 
-for i in range(len(x)):
+        bandwidth_id = torch.tensor([0])
+        wav = wav.to(device1)
+        print("Moved audio to GPU")
 
-    wav, sr = torchaudio.load(x[i])
-    # print("***:",x[i])
-    # wav = convert_audio(wav, sr, 24000, 1)                             # (1,131040)
-    bandwidth_id = torch.tensor([0])
-    wav=wav.to(device1)
-    print(i)
+        print("Starting encoding...")
+        features, discrete_code = wavtokenizer.encode_infer(wav, bandwidth_id=bandwidth_id)
+        print(f"Encoding complete. Features shape: {features.shape}")
 
-    features,discrete_code= wavtokenizer.encode_infer(wav, bandwidth_id=bandwidth_id)
-    features_all.append(features)
+        features_all.append(features)
+        print("Features stored successfully")
 
-# wavtokenizer = wavtokenizer.to(device2)
+    except Exception as e:
+        print(f"Error processing file {wav_path}: {str(e)}")
+        continue
 
-for i in range(len(x)):
+# Decode and save all files
+print("\nStarting decoding process...")
+for i, wav_path in enumerate(wav_files):
+    try:
+        print(f"\nDecoding file {i + 1}/{len(wav_files)}")
+        print(f"Processing: {wav_path}")
 
-    bandwidth_id = torch.tensor([0])
+        bandwidth_id = torch.tensor([0]).to(device1)
+        print("Starting decode...")
+        audio_out = wavtokenizer.decode(features_all[i], bandwidth_id=bandwidth_id)
+        print(f"Decode complete. Output audio shape: {audio_out.shape}")
 
-    bandwidth_id = bandwidth_id.to(device1) 
+        # Create output path
+        output_filename = os.path.basename(wav_path)
+        audio_path = os.path.join(tmptmp, output_filename)
+        print(f"Saving to: {audio_path}")
 
-    print(i)
-    audio_out = wavtokenizer.decode(features_all[i], bandwidth_id=bandwidth_id)   
-    # print(i,time.time()) 
-    # breakpoint()                        # (1, 131200)
-    audio_path = out_folder + '/' + ll + '/' + x[i].split('/')[-1]
-    # os.makedirs(out_folder + '/' + ll, exist_ok=True)
-    torchaudio.save(audio_path, audio_out.cpu(), sample_rate=24000, encoding='PCM_S', bits_per_sample=16)
+        torchaudio.save(
+            audio_path, audio_out.cpu(), sample_rate=24000, encoding="PCM_S", bits_per_sample=16
+        )
+        print("File saved successfully")
 
+    except Exception as e:
+        print(f"Error decoding/saving file {wav_path}: {str(e)}")
+        continue
 
-
-
-
+print("\nScript execution completed!")
+print(f"Processed {len(wav_files)} files")
+print(f"Output files can be found in: {tmptmp}")
